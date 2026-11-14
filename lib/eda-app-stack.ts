@@ -100,8 +100,6 @@ export class EDAAppStack extends cdk.Stack {
         resources: ["*"],
       })
     );
-
-    // Output
     
     new cdk.CfnOutput(this, "bucketName", {
       value: imagesBucket.bucketName,
