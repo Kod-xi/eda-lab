@@ -1,3 +1,4 @@
+env.ts
 *.js
 !jest.config.js
 *.d.ts
