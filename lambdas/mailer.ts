@@ -43,7 +43,7 @@ export const handler: SQSHandler = async (event: any) => {
           await client.send(new SendEmailCommand(params));
         } catch (error: unknown) {
           console.log("ERROR is: ", error);
-          // return;
+          throw error;
         }
       }
     }
@@ -61,10 +61,10 @@ function sendEmailParams({ name, email, message }: ContactDetails) {
           Charset: "UTF-8",
           Data: getHtmlContent({ name, email, message }),
         },
-        // Text: {           // For demo purposes
-        //   Charset: "UTF-8",
-        //   Data: getTextContent({ name, email, message }),
-        // },
+        Text: {           // For demo purposes
+          Charset: "UTF-8",
+          Data: getTextContent({ name, email, message }),
+        },
       },
       Subject: {
         Charset: "UTF-8",

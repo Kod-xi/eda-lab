@@ -8,6 +8,8 @@ import * as sqs from "aws-cdk-lib/aws-sqs";
 import * as sns from "aws-cdk-lib/aws-sns";
 import * as subs from "aws-cdk-lib/aws-sns-subscriptions";
 import * as iam from "aws-cdk-lib/aws-iam";
+import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
+
 
 import { Construct } from "constructs";
 // import * as sqs from 'aws-cdk-lib/aws-sqs';
@@ -15,6 +17,13 @@ import { Construct } from "constructs";
 export class EDAAppStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
+
+    const imagesTable = new dynamodb.Table(this, "ImagesTable", {
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      partitionKey: { name: "name", type: dynamodb.AttributeType.STRING },
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+      tableName: "Images",
+    });
 
     const imagesBucket = new s3.Bucket(this, "images", {
       removalPolicy: cdk.RemovalPolicy.DESTROY,
@@ -47,14 +56,19 @@ export class EDAAppStack extends cdk.Stack {
 
     // Lambda functions
 
-    const processImageFn = new lambdanode.NodejsFunction(
+    const persistImageDataFn = new lambdanode.NodejsFunction(
       this,
-      "ProcessImage",
+      "PersistImageDataFn",
       {
         runtime: lambda.Runtime.NODEJS_22_X,
-        entry: `${__dirname}/../lambdas/processImage.ts`,
+        entry: `${__dirname}/../lambdas/persistImageData.ts`,
         timeout: cdk.Duration.seconds(15),
         memorySize: 128,
+        environment: {
+          TABLE_NAME: imagesTable.tableName,
+          BUCKET_NAME: imagesBucket.bucketName,
+          REGION: 'eu-west-1'
+        },
       }
     );
 
@@ -65,10 +79,10 @@ export class EDAAppStack extends cdk.Stack {
       entry: `${__dirname}/../lambdas/mailer.ts`,
     });
 
-    // S3 --> SQS
+    // S3 --> SNS --> SQS
     imagesBucket.addEventNotification(
       s3.EventType.OBJECT_CREATED,
-      new s3n.SqsDestination(imageProcessQueue)
+      new s3n.SnsDestination(newImageTopic)
     );
 
     // SQS --> Lambda
@@ -82,12 +96,13 @@ export class EDAAppStack extends cdk.Stack {
       maxBatchingWindow: cdk.Duration.seconds(5),
     });
 
-    processImageFn.addEventSource(newImageEventSource);
+    persistImageDataFn.addEventSource(newImageEventSource);
     mailerFn.addEventSource(newImageMailEventSource);
 
     // Permissions
 
-    imagesBucket.grantRead(processImageFn);
+    imagesBucket.grantRead(persistImageDataFn);
+    imagesTable.grantReadWriteData(persistImageDataFn);
 
     mailerFn.addToRolePolicy(
       new iam.PolicyStatement({
