@@ -110,6 +110,7 @@ export class EDAAppStack extends cdk.Stack {
     const newImageEventSource = new events.SqsEventSource(imageProcessQueue, {
       batchSize: 5,
       maxBatchingWindow: cdk.Duration.seconds(5),
+      reportBatchItemFailures: true,  // NEW
     });
 
     const newImageMailEventSource = new events.SqsEventSource(mailerQ, {
@@ -121,6 +122,8 @@ export class EDAAppStack extends cdk.Stack {
       batchSize: 5,
       maxBatchingWindow: cdk.Duration.seconds(10),
     });
+
+
 
 
     persistImageDataFn.addEventSource(newImageEventSource);
